@@ -1,0 +1,659 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FlexPay — اشتري دلوقتي، قسط براحتك</title>
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800;900&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --primary: #A6FF00;
+            --primary-hover: #c8ff4d;
+            --bg-dark: #0D0D0D;
+            --bg-card: #1a1a1a;
+            --bg-input: rgba(255,255,255,0.03);
+            --text-main: #fff;
+            --text-muted: rgba(255, 255, 255, 0.7);
+            --text-dim: rgba(255, 255, 255, 0.38);
+            --danger: #ff4d4d;
+            --success: #A6FF00;
+            --warning: #ffc107;
+            --radius: 12px;
+            --transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html { scroll-behavior: smooth; }
+        body { 
+            font-family: 'Tajawal', sans-serif; 
+            background: var(--bg-dark); 
+            color: var(--text-main); 
+            line-height: 1.6; 
+            overflow-x: hidden;
+        }
+
+        .container { max-width: 1200px; margin: 0 auto; padding: 0 24px; }
+        
+        /* Loading Screen */
+        #auth-loading {
+            position: fixed; inset: 0; background: var(--bg-dark);
+            z-index: 9999; display: flex; flex-direction: column;
+            align-items: center; justify-content: center; gap: 20px;
+        }
+        #auth-loading.hidden { opacity: 0; pointer-events: none; transition: opacity 0.5s; }
+        .spinner {
+            width: 40px; height: 40px; border: 3px solid rgba(166, 255, 0, 0.1);
+            border-top-color: var(--primary); border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* Navigation */
+        nav {
+            position: sticky; top: 0; z-index: 100;
+            background: rgba(13, 13, 13, 0.9); backdrop-filter: blur(12px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            padding: 16px 0;
+        }
+        .nav-content { display: flex; justify-content: space-between; align-items: center; }
+        .logo { font-size: 24px; font-weight: 900; letter-spacing: -1px; }
+        .logo span { color: var(--primary); font-style: italic; }
+
+        /* Buttons */
+        .btn { 
+            display: inline-flex; align-items:center; justify-content:center;
+            padding: 12px 24px; border-radius: var(--radius); border: none;
+            font-weight: 700; cursor: pointer; transition: var(--transition);
+            font-family: inherit; gap: 8px; font-size: 14px;
+        }
+        .btn-primary { background: var(--primary); color: #000; }
+        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(166, 255, 0, 0.3); }
+        .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn-outline { background: transparent; border: 1px solid rgba(255,255,255,0.1); color: #fff; }
+        .btn-outline:hover { background: rgba(255,255,255,0.05); border-color: rgba(255,255,255,0.3); }
+        .btn-danger { background: var(--danger); color: #fff; }
+        .btn-danger:hover { opacity: 0.9; }
+        .btn-sm { padding: 8px 16px; font-size: 13px; }
+        .btn-full { width: 100%; }
+
+        /* Views */
+        .view { display: none; min-height: 100vh; padding: 40px 0; }
+        .view.active { display: block; animation: fadeIn 0.4s ease; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* Forms */
+        .form-group { margin-bottom: 20px; }
+        .form-group label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 8px; color: var(--text-muted); }
+        .input {
+            width: 100%; background: var(--bg-input); border: 1px solid rgba(255,255,255,0.1);
+            padding: 12px 16px; border-radius: 8px; color: #fff; outline: none; transition: var(--transition);
+            font-family: inherit; font-size: 14px;
+        }
+        .input:focus { border-color: var(--primary); background: rgba(166, 255, 0, 0.02); }
+        .input-error { border-color: var(--danger) !important; }
+        .error-text { color: var(--danger); font-size: 12px; margin-top: 4px; display: none; }
+        .error-text.show { display: block; }
+
+        /* Cards */
+        .card { 
+            background: var(--bg-card); border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: var(--radius); padding: 24px;
+        }
+        .stat-label { font-size: 12px; color: var(--text-dim); text-transform: uppercase; font-weight: 700; margin-bottom: 8px; }
+        .stat-value { font-size: 28px; font-weight: 800; color: var(--primary); }
+
+        /* Grid */
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 24px; }
+        .grid-2 { grid-template-columns: repeat(2, 1fr); }
+
+        /* Modal */
+        .modal-overlay {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.7); backdrop-filter: blur(4px);
+            display: none; align-items: center; justify-content: center; z-index: 1000;
+        }
+        .modal-overlay.open { display: flex; }
+        .modal {
+            background: var(--bg-card); border: 1px solid rgba(255,255,255,0.1);
+            border-radius: var(--radius); padding: 32px; max-width: 500px; width: 90%;
+            animation: slideUp 0.3s ease;
+        }
+        @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        .modal-header { font-size: 20px; font-weight: 800; margin-bottom: 8px; }
+        .modal-sub { font-size: 13px; color: var(--text-dim); margin-bottom: 24px; }
+        .modal-footer { display: flex; gap: 12px; margin-top: 24px; }
+        .modal-footer .btn { flex: 1; }
+
+        /* Table */
+        .table-wrap { overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; }
+        th { 
+            font-size: 11px; font-weight: 700; color: var(--text-dim); 
+            text-transform: uppercase; padding: 12px; text-align: right;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+        td { padding: 12px; border-bottom: 1px solid rgba(255,255,255,0.05); }
+        tr:hover td { background: rgba(255,255,255,0.02); }
+
+        /* Toast */
+        #toast {
+            position: fixed; bottom: 24px; right: 24px;
+            background: #1a1a1a; border: 1px solid var(--primary);
+            padding: 12px 24px; border-radius: 8px; z-index: 10000;
+            transform: translateY(100px); opacity: 0; transition: var(--transition);
+            max-width: 400px;
+        }
+        #toast.show { transform: translateY(0); opacity: 1; }
+        #toast.error { border-color: var(--danger); }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .grid, .grid-2 { grid-template-columns: 1fr; }
+            .modal { width: 95%; padding: 24px; }
+            .btn { padding: 10px 20px; font-size: 13px; }
+        }
+
+        /* Utility */
+        .hidden { display: none !important; }
+        .text-center { text-align: center; }
+        .mt-24 { margin-top: 24px; }
+        .mb-24 { margin-bottom: 24px; }
+        .gap-16 { gap: 16px; }
+        .flex { display: flex; }
+        .flex-between { display: flex; justify-content: space-between; align-items: center; }
+        .flex-col { flex-direction: column; }
+    </style>
+</head>
+<body>
+
+    <!-- Loading Screen -->
+    <div id="auth-loading">
+        <div class="logo">Flex<span>Pay</span></div>
+        <div class="spinner"></div>
+        <p style="color: var(--text-muted); margin-top: 16px;">جاري التحميل...</p>
+    </div>
+
+    <!-- Navigation -->
+    <nav id="main-nav">
+        <div class="container nav-content">
+            <div class="logo">Flex<span>Pay</span></div>
+            <div id="auth-buttons" style="display: flex; gap: 12px;"></div>
+        </div>
+    </nav>
+
+    <!-- Public View -->
+    <div id="view-public" class="view container">
+        <section class="hero" style="text-align: center; padding: 60px 0;">
+            <h1 style="font-size: 48px; font-weight: 900; margin-bottom: 16px;">اشتري اللي نفسك فيه، <br><span style="color: var(--primary);">وقسط مع FlexPay</span></h1>
+            <p style="color: var(--text-muted); max-width: 600px; margin: 0 auto 32px; font-size: 16px;">أسهل وأسرع خدمة تقسيط في مصر. بدون تعقيدات، موافقة فورية، وإدارة كاملة لأقساطك من موبايلك.</p>
+            <div style="display: flex; gap: 16px; justify-content: center;">
+                <button class="btn btn-primary" onclick="openModal('register-modal')">ابدأ الآن</button>
+                <button class="btn btn-outline" onclick="openModal('login-modal')">لديّ حساب</button>
+            </div>
+        </section>
+    </div>
+
+    <!-- Customer Dashboard -->
+    <div id="view-customer" class="view container">
+        <div class="flex-between mb-24">
+            <h2>أهلاً بك، <span id="user-name">...</span></h2>
+            <button class="btn btn-outline btn-sm" onclick="handleSignOut()">تسجيل الخروج</button>
+        </div>
+        
+        <div class="grid">
+            <div class="card">
+                <div class="stat-label">القسط القادم</div>
+                <div class="stat-value" id="next-payment-amount">0.00 ج.م</div>
+                <div style="font-size: 14px; color: var(--text-muted); margin-top: 8px;">التاريخ: <span id="next-payment-date">--/--/----</span></div>
+            </div>
+            <div class="card">
+                <div class="stat-label">إجمالي المتبقي</div>
+                <div class="stat-value" id="total-remaining">0.00 ج.م</div>
+                <div style="font-size: 14px; color: var(--text-muted); margin-top: 8px;">الأقساط المتبقية: <span id="remaining-installments">0</span></div>
+            </div>
+            <div class="card">
+                <div class="stat-label">حالة الحساب</div>
+                <div id="account-status" style="display: inline-block; padding: 6px 12px; border-radius: 20px; font-size: 12px; font-weight: 800; background: rgba(166, 255, 0, 0.1); color: var(--primary);">نشط</div>
+            </div>
+        </div>
+
+        <div class="card mt-24">
+            <h3 style="margin-bottom: 16px;">سجل الأقساط</h3>
+            <div class="table-wrap">
+                <table id="payments-table">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>المنتج</th>
+                            <th>المبلغ</th>
+                            <th>التاريخ</th>
+                            <th>الحالة</th>
+                        </tr>
+                    </thead>
+                    <tbody id="payments-tbody">
+                        <tr><td colspan="5" style="text-align: center; color: var(--text-dim);">لا توجد دفعات مسجلة</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Admin Dashboard -->
+    <div id="view-admin" class="view container">
+        <div class="flex-between mb-24">
+            <h2>لوحة تحكم الإدارة</h2>
+            <button class="btn btn-outline btn-sm" onclick="handleSignOut()">تسجيل الخروج</button>
+        </div>
+
+        <div class="grid">
+            <div class="card">
+                <div class="stat-label">طلبات معلقة</div>
+                <div class="stat-value" id="admin-pending">0</div>
+            </div>
+            <div class="card">
+                <div class="stat-label">عملاء نشطين</div>
+                <div class="stat-value" id="admin-active">0</div>
+            </div>
+            <div class="card">
+                <div class="stat-label">إجمالي التحصيل</div>
+                <div class="stat-value" id="admin-revenue">0 ج.م</div>
+            </div>
+        </div>
+
+        <div class="card mt-24">
+            <h3 style="margin-bottom: 16px;">الطلبات الجديدة</h3>
+            <div class="table-wrap">
+                <table id="orders-table">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>العميل</th>
+                            <th>المبلغ</th>
+                            <th>الحالة</th>
+                            <th>الإجراء</th>
+                        </tr>
+                    </thead>
+                    <tbody id="orders-tbody">
+                        <tr><td colspan="5" style="text-align: center; color: var(--text-dim);">لا توجد طلبات</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Login Modal (Phone-based) -->
+    <div id="login-modal" class="modal-overlay">
+        <div class="modal">
+            <div class="modal-header">دخول</div>
+            <div class="modal-sub">أدخل رقم الموبايل الخاص بك</div>
+            <form onsubmit="handleLogin(event)">
+                <div class="form-group">
+                    <label>رقم الموبايل</label>
+                    <input type="tel" id="login-phone" class="input" placeholder="+201234567890" required>
+                    <div class="error-text" id="login-phone-error"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="submit" class="btn btn-primary btn-full">دخول</button>
+                    <button type="button" class="btn btn-outline btn-full" onclick="closeModal('login-modal')">إلغاء</button>
+                </div>
+            </form>
+            <p style="font-size: 12px; color: var(--text-dim); text-align: center; margin-top: 16px;">
+                ليس لديك حساب؟ <a href="#" onclick="closeModal('login-modal'); openModal('register-modal'); return false;" style="color: var(--primary); cursor: pointer;">سجل الآن</a>
+            </p>
+        </div>
+    </div>
+
+    <!-- Register Modal (Phone-based) -->
+    <div id="register-modal" class="modal-overlay">
+        <div class="modal">
+            <div class="modal-header">إنشاء حساب</div>
+            <div class="modal-sub">ابدأ رحلتك مع FlexPay</div>
+            <form onsubmit="handleRegister(event)">
+                <div class="form-group">
+                    <label>الاسم بالكامل</label>
+                    <input type="text" id="register-name" class="input" placeholder="أحمد محمد" required>
+                </div>
+                <div class="form-group">
+                    <label>رقم الموبايل</label>
+                    <input type="tel" id="register-phone" class="input" placeholder="+201234567890" required>
+                    <div class="error-text" id="register-phone-error"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="submit" class="btn btn-primary btn-full">إنشاء الحساب</button>
+                    <button type="button" class="btn btn-outline btn-full" onclick="closeModal('register-modal')">إلغاء</button>
+                </div>
+            </form>
+            <p style="font-size: 12px; color: var(--text-dim); text-align: center; margin-top: 16px;">
+                لديك حساب بالفعل؟ <a href="#" onclick="closeModal('register-modal'); openModal('login-modal'); return false;" style="color: var(--primary); cursor: pointer;">دخول</a>
+            </p>
+        </div>
+    </div>
+
+    <!-- Toast -->
+    <div id="toast"></div>
+
+    <!-- Firebase SDK -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+        import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+        import { getFirestore, doc, setDoc, getDoc, collection, query, where, getDocs, orderBy, limit, updateDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+        // Firebase Config
+        const firebaseConfig = {
+            apiKey: "AIzaSyBHQJqomnqa2jVY5IVE4eViMwEj5BjT0-c",
+            authDomain: "flexpay-183d0.firebaseapp.com",
+            projectId: "flexpay-183d0",
+            storageBucket: "flexpay-183d0.firebasestorage.app",
+            messagingSenderId: "610552309434",
+            appId: "1:610552309434:web:ef878236b756aecad70483",
+            measurementId: "G-0YNC1E361B"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        // Global State
+        window.flexPay = { auth, db, currentUser: null, userData: null };
+
+        // Auth State Observer
+        onAuthStateChanged(auth, async (user) => {
+            const loadingScreen = document.getElementById('auth-loading');
+            
+            if (user) {
+                window.flexPay.currentUser = user;
+                try {
+                    const userDoc = await getDoc(doc(db, "users", user.uid));
+                    if (userDoc.exists()) {
+                        window.flexPay.userData = userDoc.data();
+                        if (userDoc.data().role === 'admin') {
+                            showView('admin');
+                            loadAdminDashboard();
+                        } else {
+                            showView('customer');
+                            loadCustomerDashboard();
+                        }
+                    }
+                } catch (error) {
+                    console.error('Error loading user data:', error);
+                    showToast('خطأ في تحميل البيانات', 'error');
+                }
+            } else {
+                showView('public');
+            }
+            
+            loadingScreen.classList.add('hidden');
+        });
+
+        // Login Handler (Phone-based)
+        window.handleLogin = async (e) => {
+            e.preventDefault();
+            const phone = document.getElementById('login-phone').value;
+
+            try {
+                // Search for user with this phone number
+                const q = query(collection(db, "users"), where("phone", "==", phone));
+                const querySnapshot = await getDocs(q);
+
+                if (querySnapshot.empty) {
+                    showToast('رقم الموبايل غير مسجل', 'error');
+                    return;
+                }
+
+                const userData = querySnapshot.docs[0].data();
+                const userId = querySnapshot.docs[0].id;
+
+                // Sign in with custom token or create session
+                // For now, we'll use a simple approach: store the user ID in localStorage
+                localStorage.setItem('flexpay_uid', userId);
+                localStorage.setItem('flexpay_phone', phone);
+
+                // Manually trigger auth state change
+                window.flexPay.currentUser = { uid: userId };
+                window.flexPay.userData = userData;
+
+                if (userData.role === 'admin') {
+                    showView('admin');
+                    loadAdminDashboard();
+                } else {
+                    showView('customer');
+                    loadCustomerDashboard();
+                }
+
+                closeModal('login-modal');
+                showToast('تم تسجيل الدخول بنجاح');
+            } catch (error) {
+                showToast('خطأ في تسجيل الدخول: ' + error.message, 'error');
+            }
+        };
+
+        // Register Handler (Phone-based)
+        window.handleRegister = async (e) => {
+            e.preventDefault();
+            const name = document.getElementById('register-name').value;
+            const phone = document.getElementById('register-phone').value;
+
+            try {
+                // Check if phone already exists
+                const q = query(collection(db, "users"), where("phone", "==", phone));
+                const querySnapshot = await getDocs(q);
+
+                if (!querySnapshot.empty) {
+                    showToast('رقم الموبايل مسجل بالفعل', 'error');
+                    return;
+                }
+
+                // Create new user document
+                const newUserRef = doc(collection(db, "users"));
+                const userId = newUserRef.id;
+
+                await setDoc(newUserRef, {
+                    fullName: name,
+                    phone: phone,
+                    role: 'client',
+                    createdAt: new Date().toISOString()
+                });
+
+                // Store in localStorage
+                localStorage.setItem('flexpay_uid', userId);
+                localStorage.setItem('flexpay_phone', phone);
+
+                // Set current user
+                window.flexPay.currentUser = { uid: userId };
+                window.flexPay.userData = {
+                    fullName: name,
+                    phone: phone,
+                    role: 'client'
+                };
+
+                showView('customer');
+                loadCustomerDashboard();
+                closeModal('register-modal');
+                showToast('تم إنشاء الحساب بنجاح');
+            } catch (error) {
+                showToast('خطأ في إنشاء الحساب: ' + error.message, 'error');
+            }
+        };
+
+        // Sign Out Handler
+        window.handleSignOut = async () => {
+            try {
+                localStorage.removeItem('flexpay_uid');
+                localStorage.removeItem('flexpay_phone');
+                window.flexPay.currentUser = null;
+                window.flexPay.userData = null;
+                showView('public');
+                showToast('تم تسجيل الخروج');
+            } catch (error) {
+                showToast('خطأ في تسجيل الخروج', 'error');
+            }
+        };
+
+        // Load Customer Dashboard
+        window.loadCustomerDashboard = async () => {
+            const user = window.flexPay.currentUser;
+            const userData = window.flexPay.userData;
+
+            document.getElementById('user-name').textContent = userData.fullName || 'عميل';
+
+            // Fetch latest order
+            try {
+                const q = query(
+                    collection(db, "orders"),
+                    where("userId", "==", user.uid),
+                    orderBy("createdAt", "desc"),
+                    limit(1)
+                );
+                const querySnapshot = await getDocs(q);
+
+                if (!querySnapshot.empty) {
+                    const order = querySnapshot.docs[0].data();
+                    const orderId = querySnapshot.docs[0].id;
+
+                    const monthly = order.monthlyAmount || 0;
+                    const remaining = (order.months || 0) - (order.paidInstallments || 0);
+                    const totalRemaining = monthly * remaining;
+
+                    document.getElementById('next-payment-amount').textContent = monthly.toLocaleString('ar-EG') + ' ج.م';
+                    document.getElementById('total-remaining').textContent = totalRemaining.toLocaleString('ar-EG') + ' ج.م';
+                    document.getElementById('remaining-installments').textContent = remaining;
+
+                    if (order.nextInstallmentDate) {
+                        const date = new Date(order.nextInstallmentDate);
+                        document.getElementById('next-payment-date').textContent = date.toLocaleDateString('ar-EG');
+                    }
+
+                    // Populate payments table
+                    const tbody = document.getElementById('payments-tbody');
+                    tbody.innerHTML = `
+                        <tr>
+                            <td>${orderId.slice(-6).toUpperCase()}</td>
+                            <td>${order.productName || 'منتج'}</td>
+                            <td>${order.totalAmount.toLocaleString('ar-EG')} ج.م</td>
+                            <td>${new Date(order.createdAt).toLocaleDateString('ar-EG')}</td>
+                            <td><span style="background: rgba(166,255,0,0.1); color: var(--primary); padding: 4px 8px; border-radius: 4px; font-size: 11px;">${order.status === 'active' ? 'نشط' : 'معلق'}</span></td>
+                        </tr>
+                    `;
+                }
+            } catch (error) {
+                console.error('Error loading orders:', error);
+            }
+        };
+
+        // Load Admin Dashboard
+        window.loadAdminDashboard = async () => {
+            try {
+                // Get pending orders
+                const pendingQ = query(collection(db, "orders"), where("status", "==", "pending"));
+                const pendingSnap = await getDocs(pendingQ);
+                document.getElementById('admin-pending').textContent = pendingSnap.size;
+
+                // Get active orders
+                const activeQ = query(collection(db, "orders"), where("status", "==", "active"));
+                const activeSnap = await getDocs(activeQ);
+                document.getElementById('admin-active').textContent = activeSnap.size;
+
+                // Calculate total revenue
+                let totalRevenue = 0;
+                activeSnap.forEach(doc => {
+                    const order = doc.data();
+                    totalRevenue += (order.monthlyAmount || 0) * (order.paidInstallments || 0);
+                });
+                document.getElementById('admin-revenue').textContent = totalRevenue.toLocaleString('ar-EG') + ' ج.م';
+
+                // Populate orders table
+                const tbody = document.getElementById('orders-tbody');
+                if (pendingSnap.empty) {
+                    tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: var(--text-dim);">لا توجد طلبات معلقة</td></tr>';
+                } else {
+                    tbody.innerHTML = pendingSnap.docs.map(doc => {
+                        const order = doc.data();
+                        return `
+                            <tr>
+                                <td>${doc.id.slice(-6).toUpperCase()}</td>
+                                <td>${order.clientName || 'عميل'}</td>
+                                <td>${order.totalAmount.toLocaleString('ar-EG')} ج.م</td>
+                                <td><span style="background: rgba(255,193,7,0.1); color: var(--warning); padding: 4px 8px; border-radius: 4px; font-size: 11px;">معلق</span></td>
+                                <td>
+                                    <button class="btn btn-sm btn-primary" onclick="approveOrder('${doc.id}')">قبول</button>
+                                    <button class="btn btn-sm btn-danger" onclick="rejectOrder('${doc.id}')">رفض</button>
+                                </td>
+                            </tr>
+                        `;
+                    }).join('');
+                }
+            } catch (error) {
+                console.error('Error loading admin dashboard:', error);
+            }
+        };
+
+        // Approve Order
+        window.approveOrder = async (orderId) => {
+            try {
+                await updateDoc(doc(db, "orders", orderId), { status: 'active' });
+                showToast('تم قبول الطلب');
+                loadAdminDashboard();
+            } catch (error) {
+                showToast('خطأ في قبول الطلب', 'error');
+            }
+        };
+
+        // Reject Order
+        window.rejectOrder = async (orderId) => {
+            try {
+                await updateDoc(doc(db, "orders", orderId), { status: 'rejected' });
+                showToast('تم رفض الطلب');
+                loadAdminDashboard();
+            } catch (error) {
+                showToast('خطأ في رفض الطلب', 'error');
+            }
+        };
+    </script>
+
+    <!-- UI Logic -->
+    <script>
+        function showView(viewName) {
+            document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+            const target = document.getElementById(`view-${viewName}`);
+            if (target) target.classList.add('active');
+            updateNav(viewName);
+        }
+
+        function updateNav(viewName) {
+            const authBtns = document.getElementById('auth-buttons');
+            if (viewName === 'public') {
+                authBtns.innerHTML = `
+                    <button class="btn btn-outline btn-sm" onclick="openModal('login-modal')">دخول</button>
+                    <button class="btn btn-primary btn-sm" onclick="openModal('register-modal')">تسجيل</button>
+                `;
+            } else {
+                authBtns.innerHTML = `<button class="btn btn-outline btn-sm" onclick="handleSignOut()">تسجيل الخروج</button>`;
+            }
+        }
+
+        function openModal(modalId) {
+            document.getElementById(modalId).classList.add('open');
+        }
+
+        function closeModal(modalId) {
+            document.getElementById(modalId).classList.remove('open');
+        }
+
+        function showToast(message, type = 'success') {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.className = type === 'error' ? 'error show' : 'show';
+            setTimeout(() => toast.classList.remove('show'), 3000);
+        }
+
+        // Close modals on overlay click
+        document.querySelectorAll('.modal-overlay').forEach(overlay => {
+            overlay.addEventListener('click', (e) => {
+                if (e.target === overlay) {
+                    overlay.classList.remove('open');
+                }
+            });
+        });
+    </script>
+</body>
+</html>
